@@ -1,7 +1,6 @@
 package routinepool
 
 import (
-    "errors"
     "log"
     "sync"
     "sync/atomic"
@@ -29,6 +28,14 @@ type RoutinePool struct {
 type poolTask struct {
     task         func()
     panicHandler func(any)
+}
+
+type PoolRejectsScheduleErr struct {
+    reason string
+}
+
+func (e *PoolRejectsScheduleErr) Error() string {
+    return "pool rejects to schedule the task: " + e.reason
 }
 
 // New creates a goroutine pool.
@@ -60,15 +67,19 @@ func New(corePoolSize, maxPoolSize, queueSize uint64, maxIdleTime time.Duration)
 }
 
 func (p *RoutinePool) Schedule(task func(), panicHandler func(any)) error {
+    if task == nil {
+        return &PoolRejectsScheduleErr{reason: "task is nil"}
+    }
+
     if p.getPoolStatus() != running {
-        return errors.New("pool is shutting")
+        return &PoolRejectsScheduleErr{reason: "pool is not running"}
     }
 
     p.rwmu.RLock()
     defer p.rwmu.RUnlock()
 
     if p.status != running {
-        return errors.New("pool is shutting")
+        return &PoolRejectsScheduleErr{reason: "pool is not running"}
     }
 
     t := poolTask{
@@ -96,7 +107,7 @@ func (p *RoutinePool) Schedule(task func(), panicHandler func(any)) error {
     default:
     }
 
-    return errors.New("pool rejects to schedule the task")
+    return &PoolRejectsScheduleErr{reason: "pool was full just now"}
 }
 
 func (p *RoutinePool) ShutDown() {

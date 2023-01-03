@@ -50,14 +50,18 @@ func main() {
         }
     }
 
+    if err := pool.Schedule(nil, nil); err != nil {
+        log.Println(err) // pool rejects to schedule the task: task is nil
+    }
+
     if err := pool.Schedule(func() {}, nil); err != nil {
-        log.Println(err) // pool is full: pool rejects to schedule the task
+        log.Println(err) // pool rejects to schedule the task: pool was full just now
     }
 
     pool.ShutDown()
     log.Println(pool.IsShuttingDown()) // true, pool is shutting down
     if err := pool.Schedule(func() {}, nil); err != nil {
-        log.Println(err) // pool is shutting
+        log.Println(err) // pool rejects to schedule the task: pool is not running
     }
 
     log.Println(pool.IsTerminated()) // false, waiting for the tasks left in the pool
